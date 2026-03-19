@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0a0a0f">
+    <meta name="theme-color" content="#050510">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>A.D.A - Advanced Design Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style-astro.css">
         * {
             margin: 0;
             padding: 0;
@@ -769,7 +769,10 @@
     </style>
 </head>
 <body>
-    <div class="app-container">
+    <!-- Orb Background -->
+    <div id="orb-container"></div>
+    
+    <div class="app-container glass-panel">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
@@ -1344,6 +1347,19 @@
         messageInput.addEventListener('input', () => {
             messageInput.style.height = 'auto';
             messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+        });
+    </script>
+    
+    <!-- ASTRO Orb Background -->
+    <script src="orb.js"></script>
+    <script>
+        // Initialize Orb
+        let orb = null;
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('orb-container');
+            if (container && typeof OrbRenderer !== 'undefined') {
+                orb = new OrbRenderer(container, { hue: 180 });
+            }
         });
     </script>
 </body>

@@ -1,0 +1,1540 @@
+/* ================================================================
+   ASTRO FRONTEND — Dark Glass UI
+   ================================================================
+
+   DESIGN SYSTEM OVERVIEW
+   ----------------------
+   This stylesheet powers a single-page AI chat assistant with a
+   futuristic, dark "glass-morphism" aesthetic. Key design pillars:
+
+   1. DARK THEME — Near-black background (#050510) with layered
+      semi-transparent surfaces. All colour is delivered through
+      translucent whites and a purple/teal accent palette.
+
+   2. GLASS-MORPHISM — Panels use `backdrop-filter: blur()` to
+      create a frosted-glass look, letting a decorative animated
+      "orb" glow through from behind.
+
+   3. CSS CUSTOM PROPERTIES — Every shared colour, radius, timing
+      function, and font is stored in :root variables so the entire
+      theme can be adjusted from one place.
+
+   4. LAYOUT — A full-viewport flex column: Header → Chat → Input.
+      The animated orb sits behind everything with `position: fixed`.
+
+   5. RESPONSIVE — Two breakpoints (768 px tablets, 480 px phones)
+      progressively hide decorative elements and tighten spacing
+      while preserving usability. iOS safe-area insets are honoured.
+
+   FILE STRUCTURE (top → bottom):
+     • CSS Custom Properties (:root)
+     • Reset / Base
+     • Glass Panel utility class
+     • App Layout shell
+     • Orb (animated background decoration)
+     • Header  (logo, mode switch, status badge, new-chat button)
+     • Chat Area  (message list, welcome screen, message bubbles,
+                   typing indicator, streaming cursor)
+     • Input Bar  (textarea, action buttons — mic, TTS, send)
+     • Scrollbar customisation
+     • Keyframe Animations
+     • Responsive Breakpoints
+   ================================================================ */
+
+
+/* ================================================================
+   CSS CUSTOM PROPERTIES (Design Tokens)
+   ================================================================
+   Everything that might be reused or tweaked lives here.
+   Changing a single variable updates the whole UI consistently.
+   ================================================================ */
+:root {
+    /* ---- Backgrounds ---- */
+    --bg: #050510;                                /* Page-level dark background */
+    --glass-bg: rgba(10, 10, 28, 0.72);          /* Semi-transparent fill for glass panels (header, input bar) */
+    --glass-border: rgba(255, 255, 255, 0.06);   /* Subtle white border that outlines glass panels */
+    --glass-hover: rgba(255, 255, 255, 0.10);    /* Slightly brighter fill on hover */
+
+    /* ---- Accent colours ---- */
+    --accent: #7c6aef;                            /* Primary purple accent — buttons, highlights, glows */
+    --accent-glow: rgba(124, 106, 239, 0.35);    /* Soft purple used for box-shadows / focus rings */
+    --accent-secondary: #4ecdc4;                  /* Teal complement — used in gradients alongside --accent */
+
+    /* ---- Text ---- */
+    --text: rgba(255, 255, 255, 0.93);            /* Primary readable text — near-white */
+    --text-dim: rgba(255, 255, 255, 0.50);        /* Secondary / de-emphasised text */
+    --text-muted: rgba(255, 255, 255, 0.28);      /* Tertiary — labels, meta info, placeholders */
+
+    /* ---- Semantic colours ---- */
+    --danger: #ff6b6b;                            /* Destructive / recording state (mic listening) */
+    --success: #51cf66;                           /* Online status, success feedback */
+
+    /* ---- Border radii ---- */
+    --radius: 16px;                               /* Large radius — panels, bubbles */
+    --radius-sm: 10px;                            /* Medium radius — buttons, avatars */
+    --radius-xs: 6px;                             /* Small radius — notched bubble corners */
+
+    /* ---- Layout ---- */
+    --header-h: 64px;                             /* Fixed header height — used to reserve space */
+    --input-bar-h: calc(88px + env(safe-area-inset-bottom, 0px)); /* Panels sit above input bar (no mode label) */
+    --content-gap: 16px;                           /* Vertical gap between header/content/input */
+    --panel-gap: 14px;                             /* Gap above/below side panels (Activity, Search) */
+
+    /* ---- Motion ---- */
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Shared easing curve (Material "standard" ease) for all micro-interactions.
+       Starts slow, accelerates, then decelerates for a natural feel. */
+
+    /* ---- Typography ---- */
+    --font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Poppins as primary; system fonts as fallback for fast initial render. */
+}
+
+
+/* ================================================================
+   RESET & BASE STYLES
+   ================================================================
+   A minimal "universal reset" that strips browser defaults so
+   every element starts from zero. `box-sizing: border-box` makes
+   padding/border count inside the declared width/height — the most
+   intuitive model for layout work.
+   ================================================================ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* Full viewport height; chat area scrolls internally. Overlay has
+   pointer-events: none so scroll works when panels are open. */
+html, body { height: 100%; overflow: hidden; overflow-x: hidden; }
+
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;          /* Smoother font rendering on macOS/iOS WebKit */
+    -webkit-tap-highlight-color: transparent;      /* Removes the blue tap flash on mobile WebKit */
+}
+
+/* Reset native button / textarea styling so we control everything */
+button { font-family: var(--font); cursor: pointer; border: none; background: none; color: inherit; }
+textarea { font-family: var(--font); color: var(--text); }
+
+
+/* ================================================================
+   GLASS PANEL — Reusable Utility Class
+   ================================================================
+   The signature "frosted glass" look. Applied to the header and
+   input bar (any element that needs a translucent panel).
+
+   HOW IT WORKS:
+   • `background` — a dark, semi-transparent fill (72 % opacity).
+   • `backdrop-filter: blur(32px) saturate(1.2)` — blurs whatever
+     is *behind* the element (the orb glow, the chat) and slightly
+     boosts colour saturation for a richer look.
+   • `-webkit-backdrop-filter` — Safari still needs the prefix.
+   • `border` — a faint 6 %-white hairline that catches light at
+     the edges, reinforcing the glass illusion.
+   ================================================================ */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(32px) saturate(1.2);
+    -webkit-backdrop-filter: blur(32px) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+}
+
+
+/* ================================================================
+   APP LAYOUT SHELL
+   ================================================================
+   The top-level `.app` container is a vertical flex column that
+   fills the entire viewport: Header (fixed) → Chat (grows) → Input
+   (fixed).
+
+   `100dvh` (dynamic viewport height) is the modern replacement for
+   `100vh` on mobile browsers — it accounts for the URL bar sliding
+   in and out. The plain `100vh` above it is a fallback for older
+   browsers that don't understand `dvh`.
+   ================================================================ */
+.app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;              /* Fallback for browsers without dvh support */
+    height: 100dvh;             /* Preferred: adjusts for mobile browser chrome */
+    overflow: hidden;
+}
+
+
+/* ================================================================
+   ORB BACKGROUND — Animated Decorative Element
+   ================================================================
+   The "orb" is a large, softly-glowing circle (rendered by JS /
+   canvas inside #orb-container) that sits dead-centre behind all
+   content. It provides ambient motion and reacts to AI state.
+
+   POSITIONING:
+   • `position: fixed` + `top/left 50%` + `translate -50% -50%`
+     centres it in the viewport regardless of scroll.
+   • `min(600px, 80vw)` — caps the orb at 600 px but lets it shrink
+     on small screens so it never overflows.
+   • `z-index: 0` — behind everything; content layers sit above.
+   • `pointer-events: none` — clicks pass straight through.
+   • `opacity: 0.35` — subtle by default; it brightens on activity.
+   ================================================================ */
+#orb-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: min(600px, 80vw);
+    height: min(600px, 80vw);
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.35;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+/* ORB ACTIVE STATES
+   When the AI is actively processing (.active) or speaking aloud
+   (.speaking), the orb ramps to full opacity and plays a gentle
+   breathing scale animation (orbPulse) so the user sees the AI
+   is "alive". */
+#orb-container.active,
+#orb-container.speaking {
+    opacity: 1;
+    animation: orbPulse 1.6s ease-in-out infinite;
+}
+
+/* No overlay/scrim on the orb — the orb is the only background effect.
+   Previously a radial gradient darkened the edges; removed so only the
+   central orb remains visible without circular shades. */
+
+
+/* ================================================================
+   HEADER
+   ================================================================
+   A horizontal flex row pinned to the top of the app.
+
+   LAYOUT:
+   • `justify-content: space-between` pushes left group (logo) and
+     right group (status / new-chat) to opposite edges; the mode
+     switch sits in the centre via the gap.
+   • `z-index: 10` ensures the header floats above the chat area
+     and the orb scrim.
+   • Bottom border-radius rounds only the lower corners, creating
+     a "floating shelf" look that separates it from chat content.
+   • `flex-shrink: 0` prevents the header from collapsing when the
+     chat area needs space.
+   ================================================================ */
+.header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    height: var(--header-h);
+    padding: 0 24px;
+    margin-bottom: var(--content-gap);
+    border-radius: 0 0 var(--radius) var(--radius);
+    border-top: none;
+    flex-shrink: 0;
+}
+
+/* HEADER LEFT — Logo + Tagline (base layout; mobile overrides below) */
+
+/* LOGO
+   Gradient text effect: a linear gradient is painted as the
+   background, then `background-clip: text` masks it to only show
+   through the letter shapes. `-webkit-text-fill-color: transparent`
+   makes the original text colour invisible so the gradient shows. */
+.logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* TAGLINE — small muted descriptor beneath / beside the logo */
+.tagline {
+    font-size: 0.68rem;
+    font-weight: 300;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+}
+
+/* ----------------------------------------------------------------
+   MODE SWITCH — Chat / Voice Toggle
+   ----------------------------------------------------------------
+   A pill-shaped toggle with two buttons and a sliding highlight.
+   
+   STRUCTURE:
+   • `.mode-switch` — the outer pill (flex row, dark bg, rounded).
+   • `.mode-slider` — an absolutely-positioned coloured rectangle
+     that slides left↔right to indicate the active mode.
+   • `.mode-btn` — individual clickable labels ("Chat", "Voice").
+
+   The slider width is `calc(50% - 4px)` — half the pill minus
+   the padding — so it exactly covers one button. When `.right` is
+   added (by JS), `translateX(calc(100% + 2px))` shifts it over
+   to highlight the second button.
+   ---------------------------------------------------------------- */
+.mode-switch {
+    position: relative;
+    display: flex;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 3px;
+    gap: 2px;
+}
+.mode-slider {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: calc(50% - 4px);           /* Exactly covers one button */
+    height: calc(100% - 6px);         /* Full height minus top+bottom padding */
+    background: var(--accent);
+    border-radius: 10px;
+    transition: transform var(--transition);
+    opacity: 0.18;                     /* Tinted, not solid — keeps it subtle */
+}
+.mode-slider.right {
+    transform: translateX(calc(100% + 2px)); /* Slide to the second button (2-btn layout) */
+}
+/* 3-way mode switch: Astro | General | Realtime */
+.mode-switch-three {
+    min-width: 0;
+}
+.mode-switch-three .mode-btn {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+    padding: 7px 10px;
+}
+.mode-switch-three .mode-slider {
+    width: calc(33.333% - 4px);
+}
+.mode-switch-three .mode-slider.center {
+    transform: translateX(calc(100% + 2px));
+}
+.mode-switch-three .mode-slider.right {
+    transform: translateX(calc(200% + 4px));
+}
+.mode-btn {
+    position: relative;
+    z-index: 1;                        /* Above the slider background */
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    border-radius: 10px;
+    color: var(--text-dim);
+    transition: color var(--transition);
+    white-space: nowrap;               /* Prevents label from wrapping at narrow widths */
+}
+.mode-btn.active { color: var(--text); }          /* Active mode gets full-white text */
+.mode-btn svg {
+    opacity: 0.7;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    flex-shrink: 0;
+}
+.mode-btn.active svg { opacity: 1; }              /* Full opacity when active */
+
+/* ----------------------------------------------------------------
+   HEADER SECTIONS — Prevent overflow on mobile
+   ---------------------------------------------------------------- */
+.header-left { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; min-width: 0; }
+.header-center { flex: 1; min-width: 0; display: flex; justify-content: center; align-items: center; }
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+}
+
+/* STATUS BADGE — shows a coloured dot + "Online" / "Offline" label */
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
+/* STATUS DOT
+   A small circle with a coloured glow (box-shadow). The `pulse-dot`
+   animation fades it in and out to convey a "heartbeat" while online. */
+.status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+/* When the server is unreachable, switch to red and stop pulsing */
+.status-dot.offline {
+    background: var(--danger);
+    box-shadow: 0 0 6px var(--danger);
+    animation: none;
+}
+
+/* ICON BUTTON — generic small square button (e.g. "New Chat").
+   `display: grid; place-items: center` is the quickest way to
+   perfectly centre a single child (the SVG icon). */
+.btn-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    transition: background var(--transition), border-color var(--transition);
+    touch-action: manipulation;   /* Prevent double-tap zoom on mobile */
+    -webkit-tap-highlight-color: transparent;
+}
+.btn-icon:hover {
+    background: var(--glass-hover);
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+
+/* ================================================================
+   CHAT AREA
+   ================================================================
+   The scrollable middle section between header and input bar.
+
+   `flex: 1` makes it absorb all remaining vertical space.
+   The inner `.chat-messages` div does the actual scrolling
+   (`overflow-y: auto`) so the header and input bar stay fixed.
+   `scroll-behavior: smooth` gives programmatic scrollTo() calls
+   a gentle animation.
+   ================================================================ */
+.chat-area {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;               /* Allow flex child to shrink and scroll */
+}
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 24px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ----------------------------------------------------------------
+   WELCOME SCREEN
+   ----------------------------------------------------------------
+   Shown when the conversation is empty. A vertically & horizontally
+   centred splash with a title, subtitle, and suggestion chips.
+   `flex: 1` + centering fills the entire chat area.
+   `fadeIn` animation slides it up gently on first load.
+   ---------------------------------------------------------------- */
+.welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    flex: 1;
+    gap: 16px;
+    padding: 48px 24px;
+    animation: fadeIn 0.6s ease;
+}
+.welcome-icon {
+    color: var(--accent);
+    opacity: 0.5;
+    margin-bottom: 6px;
+}
+/* Same gradient-text technique as the logo */
+.welcome-title {
+    font-size: 1.7rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--text), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.welcome-sub {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    font-weight: 300;
+}
+
+/* SUGGESTION CHIPS — quick-tap prompts */
+.welcome-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+}
+.chip {
+    padding: 10px 20px;
+    font-size: 0.76rem;
+    font-weight: 400;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    transition: all var(--transition);
+}
+.chip:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(124, 106, 239, 0.25);
+}
+
+
+/* ================================================================
+   MESSAGE BUBBLES
+   ================================================================
+   Each message is a horizontal flex row: avatar + body.
+   `max-width: 760px` + `margin: 0 auto` centres the conversation
+   in a readable column on wide screens.
+
+   User vs. Assistant differentiation:
+   • `.message.user` reverses the flex direction so the avatar
+     appears on the right.
+   • Background colours differ: assistant is neutral white-tint,
+     user is purple-tinted (matching --accent).
+   • One corner of each bubble is given a smaller radius to create
+     a "speech bubble notch" that points toward the avatar.
+   ================================================================ */
+.message {
+    display: flex;
+    gap: 12px;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+    animation: msgIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.message.user { flex-direction: row-reverse; } /* Avatar on the right for user */
+
+/* MESSAGE AVATAR — small icon square beside each bubble */
+.msg-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    flex-shrink: 0;             /* Never let the avatar shrink */
+    margin-top: 4px;            /* Align with the first line of text */
+}
+/* SVG icon inside avatar — sized to fit the circle, inherits color from parent */
+.msg-avatar .msg-avatar-icon {
+    width: 18px;
+    height: 18px;
+}
+/* Assistant avatar: purple→teal gradient to match the brand */
+.message.assistant .msg-avatar {
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    color: #fff;
+}
+/* User avatar: neutral dark chip */
+.message.user .msg-avatar {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-dim);
+}
+
+/* MSG-BODY — column wrapper for label + content bubble.
+   `min-width: 0` is a flex-child fix that allows long words to
+   trigger `word-wrap: break-word` instead of overflowing. */
+.msg-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+/* MSG-CONTENT — the actual text bubble */
+.msg-content {
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    font-size: 0.87rem;
+    line-height: 1.65;
+    font-weight: 400;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+/* Assistant bubble: neutral grey-white tint, notch top-left */
+.message.assistant .msg-content {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-top-left-radius: var(--radius-xs);     /* Notch pointing toward avatar */
+}
+/* User bubble: purple-tinted, notch top-right */
+.message.user .msg-content {
+    background: rgba(124, 106, 239, 0.13);
+    border: 1px solid rgba(124, 106, 239, 0.16);
+    border-top-right-radius: var(--radius-xs);    /* Notch pointing toward avatar */
+}
+
+/* MSG-LABEL — tiny "ASTRO" / "You" text above the bubble */
+.msg-label {
+    font-size: 0.66rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 0 4px;
+}
+.message.user .msg-label { text-align: right; }  /* Right-align label for user */
+
+/* Main chat area: no animations — clean static placeholder only.
+   Animations live in the activity panel (left) and search results (right). */
+
+/* STREAMING CURSOR — blinking pipe character appended while the AI
+   streams its response token-by-token. */
+.stream-cursor {
+    animation: blink 0.8s step-end infinite;
+    color: var(--accent);
+    margin-left: 1px;
+}
+
+
+/* ================================================================
+   INPUT BAR
+   ================================================================
+   Pinned to the bottom of the app. Like the header, it uses the
+   glass-panel class for the frosted look.
+
+   iOS SAFE-AREA HANDLING:
+   `padding-bottom: max(10px, env(safe-area-inset-bottom, 10px))`
+   ensures the input never hides behind the iPhone home-indicator
+   bar. `env(safe-area-inset-bottom)` is a CSS environment variable
+   injected by WebKit on notched iPhones; the `max()` guarantees
+   at least 10 px even on devices without a home bar.
+
+   `flex-shrink: 0` prevents the input bar from being squished when
+   the chat area grows.
+   ================================================================ */
+.input-bar {
+    position: relative;
+    z-index: 10;
+    padding: 14px 24px 14px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
+    margin-top: var(--content-gap);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-bottom: none;
+    flex-shrink: 0;
+    box-shadow: none; /* Override glass-panel — no rectangular glow */
+}
+
+/* INPUT WRAPPER — the rounded pill that holds textarea + buttons.
+   `align-items: flex-end` keeps action buttons bottom-aligned when
+   the textarea grows taller (multi-line input). */
+.input-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 8px 8px 8px 18px;
+    transition: border-color var(--transition);
+    box-shadow: none; /* No glow — keep it simple */
+}
+/* Focus: subtle border when typing */
+.input-wrapper:focus-within {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* TEXTAREA — auto-growing text input (height controlled by JS).
+   `resize: none` disables the browser's drag-to-resize handle.
+   `max-height: 120px` caps growth so it doesn't consume the screen. */
+.input-wrapper textarea {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 0.87rem;
+    line-height: 1.5;
+    padding: 8px 0;
+    max-height: 120px;
+    color: var(--text);
+}
+.input-wrapper textarea::placeholder { color: var(--text-muted); }
+.input-wrapper textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ACTION BUTTONS ROW — sits to the right of the textarea */
+.input-actions {
+    display: flex;
+    gap: 6px;
+    padding-bottom: 2px;       /* Micro-nudge to visually centre with one-line textarea */
+    flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------------
+   ACTION BUTTON — Base Style (Mic, TTS, Send)
+   ----------------------------------------------------------------
+   All three input buttons share this base: a fixed-size square
+   with rounded corners and a subtle background. `display: grid;
+   place-items: center` perfectly centres the SVG icon.
+   ---------------------------------------------------------------- */
+.action-btn {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;            /* Prevents flex from shrinking the button */
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all var(--transition);
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+.action-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.16);
+    color: var(--text);
+    transform: translateY(-1px);  /* Lift effect */
+}
+.action-btn:active {
+    transform: translateY(0);      /* Press-down snap back */
+}
+
+/* ----------------------------------------------------------------
+   SEND BUTTON — Accent-Coloured Call-to-Action
+   ----------------------------------------------------------------
+   Uses `!important` to override the generic `.action-btn` styles
+   because both selectors have the same specificity. This is the
+   only button that's always visually prominent (purple fill).
+   ---------------------------------------------------------------- */
+.send-btn {
+    background: var(--accent) !important;
+    border-color: var(--accent) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(124, 106, 239, 0.25);  /* Purple underglow */
+}
+.send-btn:hover {
+    background: #6a58e0 !important;       /* Slightly darker purple on hover */
+    border-color: #6a58e0 !important;
+    box-shadow: 0 4px 14px rgba(124, 106, 239, 0.35); /* Stronger glow */
+}
+/* Disabled state: greyed out, no glow, no cursor, no lift */
+.send-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+    box-shadow: none;
+    transform: none;
+    animation: sendBtnPulse 1.2s ease-in-out infinite;
+}
+@keyframes sendBtnPulse {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 0.7; }
+}
+
+/* ----------------------------------------------------------------
+   MIC BUTTON — Default + Listening States
+   ----------------------------------------------------------------
+   Two SVG icons live inside the button; only one is visible at a
+   time via `display: none` toggling.
+
+   DEFAULT: muted grey square (inherits .action-btn).
+   LISTENING (.listening): red-tinted background + border + danger
+   colour text, plus a pulsing red ring animation (micPulse) to
+   convey "recording in progress".
+   ---------------------------------------------------------------- */
+.mic-btn .mic-icon-active { display: none; }           /* Hidden when NOT listening */
+.mic-btn.listening .mic-icon { display: none; }        /* Hide default icon */
+.mic-btn.listening .mic-icon-active { display: block; } /* Show active icon */
+.mic-btn.listening {
+    background: rgba(255, 107, 107, 0.18);             /* Red-tinted fill */
+    border-color: rgba(255, 107, 107, 0.3);
+    color: var(--danger);
+    animation: micPulse 1.5s ease-in-out infinite;     /* Expanding red ring */
+}
+/* Auto-listen mode: mic will restart after each AI response */
+.mic-btn.auto-listen:not(.listening) {
+    border-color: rgba(78, 205, 196, 0.4);
+    box-shadow: 0 0 0 1px rgba(78, 205, 196, 0.2);
+}
+
+/* ----------------------------------------------------------------
+   TTS (TEXT-TO-SPEECH) BUTTON — Default + Active + Speaking States
+   ----------------------------------------------------------------
+   Similar icon-swap pattern to the mic button.
+
+   DEFAULT: muted grey (inherits .action-btn). Speaker-off icon.
+   ACTIVE (.tts-active): TTS is enabled — purple tint to show it's
+     toggled on. Speaker-on icon.
+   SPEAKING (.tts-speaking): TTS is currently playing audio —
+     pulsing purple ring (ttsPulse) for visual feedback.
+   ---------------------------------------------------------------- */
+.tts-btn .tts-icon-on { display: none; }              /* Hidden when TTS is off */
+.tts-btn.tts-active .tts-icon-off { display: none; }  /* Hide "off" icon */
+.tts-btn.tts-active .tts-icon-on { display: block; }  /* Show "on" icon */
+.tts-btn.tts-active {
+    background: rgba(124, 106, 239, 0.18);            /* Purple-tinted fill */
+    border-color: rgba(124, 106, 239, 0.3);
+    color: var(--accent);
+}
+.tts-btn.tts-speaking {
+    animation: ttsPulse 1.5s ease-in-out infinite;     /* Expanding purple ring */
+}
+
+/* INPUT META — char count when message is long (mode label removed for cleaner layout) */
+.input-meta {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 6px 12px 0;
+    min-height: 0;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+}
+
+
+/* ================================================================
+   ACTIVITY PANEL (Left — Astro mode)
+   ================================================================
+   Fixed panel on the left: query detected → brain decision → route
+   → streaming. Step numbers, clear hierarchy, themed scrollbar.
+   ================================================================ */
+.panel-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 19;
+    background: transparent;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    pointer-events: none;   /* Never block — allows scroll when panels open */
+}
+.panel-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: none;   /* Panels close only via X button, not overlay click */
+}
+
+/* ================================================================
+   SPEECH-TO-TEXT WIDGET (Live transcript while listening)
+   ================================================================
+   Positioned --panel-gap above input bar (same as Activity/Search).
+   Blur background, rounded edges.
+   ================================================================ */
+.speech-widget {
+    position: fixed;
+    bottom: calc(var(--input-bar-h) + var(--panel-gap));
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    z-index: 15;
+    min-width: min(320px, 90vw);
+    max-width: min(560px, 95vw);
+    padding: 14px 20px;
+    border-radius: 16px;
+    background: rgba(10, 10, 28, 0.65);
+    backdrop-filter: blur(24px) saturate(1.3);
+    -webkit-backdrop-filter: blur(24px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(124, 106, 239, 0.08);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease;
+}
+.speech-widget.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    animation: speechWidgetIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes speechWidgetIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+.speech-widget-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.speech-widget-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.speech-widget-label::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: pulse-dot 1.2s ease-in-out infinite;
+}
+.speech-widget-text {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text);
+    min-height: 1.5em;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.speech-widget-text:empty::before {
+    content: 'Speak now...';
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Toast — error/status feedback */
+.toast-container {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+.toast {
+    padding: 12px 20px;
+    background: rgba(20, 20, 35, 0.95);
+    border: 1px solid rgba(255, 107, 107, 0.4);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 0.9rem;
+    max-width: min(400px, 90vw);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: auto;
+    cursor: pointer;
+}
+.toast.toast-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.activity-panel {
+    position: fixed;
+    top: calc(var(--header-h) + var(--panel-gap));
+    left: 0;
+    bottom: calc(var(--input-bar-h) + var(--panel-gap));
+    width: min(340px, 90vw);
+    min-width: 0;
+    height: auto;
+    z-index: 6;                                   /* Behind header (10) and input bar (10) */
+    display: flex;
+    flex-direction: column;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: 8px 0 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.activity-panel.open {
+    transform: translateX(0);
+}
+.activity-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+.activity-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.activity-title::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(124, 106, 239, 0.5);
+}
+.activity-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+.activity-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text);
+}
+.activity-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.activity-list::-webkit-scrollbar { display: none; }
+.activity-empty {
+    padding: 24px 16px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+}
+.activity-item {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    animation: activityIn 0.25s ease-out;
+}
+.activity-item .activity-event {
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.activity-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 6px;
+    background: rgba(124, 106, 239, 0.2);
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+.activity-item .activity-detail {
+    color: var(--text-dim);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.activity-item.route-general .activity-event,
+.activity-item.route-general .activity-step { color: #7dd3fc; }
+.activity-item.route-general .activity-step { background: rgba(125, 211, 252, 0.15); }
+.activity-item.route-realtime .activity-event,
+.activity-item.route-realtime .activity-step { color: var(--success); }
+.activity-item.route-realtime .activity-step { background: rgba(81, 207, 102, 0.15); }
+.activity-item.activity-sub {
+    padding: 12px 14px;
+    font-size: 0.75rem;
+    border-left: 3px solid rgba(124, 106, 239, 0.4);
+}
+.activity-item.activity-sub .activity-event { font-size: 0.76rem; }
+@keyframes activityIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+
+/* ================================================================
+   SEARCH RESULTS WIDGET (Realtime — Tavily data)
+   ================================================================
+   Fixed panel on the right: query, AI answer, source cards. Themed
+   scrollbars, responsive width, no overflow or layout bugs.
+   ================================================================ */
+.search-results-widget {
+    position: fixed;
+    top: calc(var(--header-h) + var(--panel-gap));
+    right: 0;
+    bottom: calc(var(--input-bar-h) + var(--panel-gap));
+    width: min(380px, 95vw);
+    min-width: 0;
+    height: auto;
+    z-index: 6;                                   /* Behind header (10) and input bar (10) */
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius) 0 0 var(--radius);
+    border-right: none;
+    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    overflow: hidden;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.search-results-widget.open {
+    transform: translateX(0);
+}
+.search-results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    flex-shrink: 0;
+}
+.search-results-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.search-results-title::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse-dot 2s ease-in-out infinite;
+    flex-shrink: 0;
+}
+.search-results-close {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all var(--transition);
+    flex-shrink: 0;
+}
+.search-results-close:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text);
+}
+.search-results-query {
+    padding: 12px 20px 14px;
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 500;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.search-results-answer {
+    padding: 16px 20px 18px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--text);
+    background: rgba(124, 106, 239, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    max-height: 200px;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+.search-results-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+}
+.search-result-card {
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    transition: background var(--transition), border-color var(--transition);
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.search-result-card:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.search-result-card .card-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.35;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.search-result-card .card-content {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.search-result-card .card-url {
+    font-size: 0.7rem;
+    color: var(--accent);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+}
+.search-result-card .card-url:hover {
+    text-decoration: underline;
+}
+.search-result-card .card-score {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+}
+/* Themed scrollbars for search widget (match app dark theme) */
+.search-results-answer::-webkit-scrollbar,
+.search-results-list::-webkit-scrollbar {
+    width: 6px;
+}
+.search-results-answer::-webkit-scrollbar-track,
+.search-results-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+}
+.search-results-answer::-webkit-scrollbar-thumb,
+.search-results-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+}
+.search-results-answer::-webkit-scrollbar-thumb:hover,
+.search-results-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+@supports (scrollbar-color: rgba(255,255,255,0.12) rgba(255,255,255,0.03)) {
+    .search-results-answer,
+    .search-results-list {
+        scrollbar-color: rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.03);
+        scrollbar-width: thin;
+    }
+}
+
+
+/* ================================================================
+   SETTINGS PANEL
+   ================================================================
+   Centered modal with toggle switches for auto-open behavior.
+   ================================================================ */
+.settings-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: min(360px, 92vw);
+    z-index: 21;
+    border-radius: var(--radius);
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0.25s ease, transform 0.25s ease;
+}
+.settings-panel.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+}
+.settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--glass-border);
+}
+.settings-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+.settings-body {
+    padding: 24px 20px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.settings-label {
+    font-size: 0.88rem;
+    color: var(--text);
+    cursor: pointer;
+    flex: 1;
+}
+.settings-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-top: 4px;
+}
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    transition: background var(--transition);
+}
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform var(--transition);
+}
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+
+/* ================================================================
+   SCROLLBAR CUSTOMISATION (WebKit / Chromium)
+   ================================================================
+   A nearly-invisible 4 px scrollbar that only reveals itself on
+   hover. Keeps the glass aesthetic clean without hiding scroll
+   affordance entirely.
+   ================================================================ */
+.chat-messages::-webkit-scrollbar { width: 4px; }
+.chat-messages::-webkit-scrollbar-track { background: transparent; }
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+.chat-messages::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+
+
+/* ================================================================
+   KEYFRAME ANIMATIONS
+   ================================================================
+   All animations are defined here for easy reference and reuse.
+
+   fadeIn     — Welcome screen entrance: fade up from 12 px below.
+   msgIn      — New chat message entrance: fade up from 8 px below
+                (shorter travel than fadeIn for subtlety).
+   dotBounce  — Typing-indicator dots: each dot jumps up 5 px then
+                falls back down. Staggered delays on nth-child
+                create the wave pattern.
+   blink      — Streaming cursor: toggles opacity on/off every
+                half-cycle. `step-end` makes the transition instant
+                (no gradual fade), mimicking a real text cursor.
+   pulse-dot  — Status dot heartbeat: gently fades to 40 % and back
+                over 2 s.
+   micPulse   — Mic "listening" ring: an expanding, fading box-shadow
+                ring in danger-red. Grows from 0 to 8 px then fades
+                to transparent, repeating every 1.5 s.
+   ttsPulse   — TTS "speaking" ring: same expanding ring technique
+                but in accent-purple.
+   orbPulse   — Background orb breathing: scales from 1× to 1.10×
+                while nudging opacity from 0.92 → 1, creating a
+                gentle "inhale / exhale" effect.
+   ================================================================ */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes msgIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes dotBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30%           { transform: translateY(-5px); opacity: 1; }
+}
+@keyframes blink {
+    50% { opacity: 0; }
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+@keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.3); }
+    50%      { box-shadow: 0 0 0 8px rgba(255, 107, 107, 0); }
+}
+@keyframes ttsPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(124, 106, 239, 0.3); }
+    50%      { box-shadow: 0 0 0 8px rgba(124, 106, 239, 0); }
+}
+@keyframes orbPulse {
+    0%, 100% { transform: scale(1); opacity: 0.92; }
+    50%      { transform: scale(1.10); opacity: 1; }
+}
+
+
+/* ================================================================
+   RESPONSIVE BREAKPOINTS
+   ================================================================
+
+   TABLET — max-width: 768 px
+   ----------------------------------------------------------------
+   At this size the sidebar (if any) is gone and horizontal space
+   is tighter. Changes:
+   • Header padding/gap shrinks; tagline is hidden entirely.
+   • Logo shrinks from 1.1 rem → 1 rem.
+   • Mode-switch buttons lose their SVG icons (text-only) and get
+     tighter padding, so the toggle still fits.
+   • Status badge hides its text label — only the dot remains.
+   • Chat message padding and font sizes reduce slightly.
+   • Action buttons go from 38 px → 36 px.
+   • Avatars shrink from 30 px → 26 px.
+   • Input bar honours iOS safe-area at the smaller padding value.
+   ================================================================ */
+@media (max-width: 768px) {
+    :root { --input-bar-h: calc(100px + env(safe-area-inset-bottom, 0px)); --content-gap: 12px; --panel-gap: 12px; }
+    .header { padding: 0 16px; gap: 12px; margin-bottom: var(--content-gap); }
+    .header-right { gap: 8px; }
+    .btn-icon { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+    .tagline { display: none; }
+    .logo { font-size: 1rem; }
+    .mode-btn { padding: 6px 10px; font-size: 0.72rem; }
+    .mode-btn .mode-btn-text { display: none; }   /* Icons only on mobile */
+    .status-badge .status-text { display: none; }
+    .chat-messages { padding: 18px 16px 22px; gap: 12px; }
+    .input-bar { padding: 12px 16px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom, 12px)); margin-top: var(--content-gap); }
+    .input-wrapper { padding: 4px 4px 4px 12px; }
+    .action-btn { width: 36px; height: 36px; min-width: 36px; border-radius: 9px; }
+    .msg-content { font-size: 0.84rem; padding: 10px 13px; }
+    .welcome-title { font-size: 1.3rem; }
+    .message { gap: 8px; }
+    .msg-avatar { width: 26px; height: 26px; font-size: 0.62rem; }
+    .msg-avatar .msg-avatar-icon { width: 16px; height: 16px; }
+    .search-results-widget { width: min(100vw, 360px); }
+    .search-results-header { padding: 14px 16px; }
+    .search-results-query,
+    .search-results-answer { padding: 12px 16px; }
+    .search-results-list { padding: 12px 16px 20px; gap: 12px; }
+    .search-result-card { padding: 12px 14px; }
+    .activity-panel { width: min(100vw, 320px); }
+    .activity-header { padding: 14px 16px; }
+    .activity-list { padding: 12px 16px 20px; gap: 12px; }
+    .speech-widget { bottom: calc(var(--input-bar-h) + var(--panel-gap)); min-width: min(280px, 88vw); padding: 12px 16px; }
+    .speech-widget-text { font-size: 0.85rem; }
+}
+
+/* PHONE — max-width: 480 px
+   ----------------------------------------------------------------
+   The narrowest target. Every pixel counts.
+   • Mode switch stretches to full width and centres; each button
+     gets `flex: 1` so they split evenly.
+   • "New Chat" button is hidden to save space.
+   • Suggestion chips get smaller padding and font.
+   • Action buttons shrink further to 34 px; SVG icons scale down.
+   • Gaps tighten across the board.
+   ---------------------------------------------------------------- */
+@media (max-width: 480px) {
+    :root { --input-bar-h: calc(95px + env(safe-area-inset-bottom, 0px)); --content-gap: 10px; --panel-gap: 10px; }
+    .header { padding: 0 12px; margin-bottom: var(--content-gap); gap: 8px; }
+    .header-left { flex-shrink: 0; }
+    .header-center { flex: 1; justify-content: center; display: flex; min-width: 0; }
+    .header-right { gap: 6px; }
+    .btn-icon { width: 36px; height: 36px; min-width: 36px; min-height: 36px; }
+    .logo { font-size: 0.9rem; letter-spacing: 2px; }
+    .mode-switch { width: 100%; }
+    .mode-btn { flex: 1; justify-content: center; }
+    .new-chat-btn { display: none; }
+    .chat-messages { padding: 14px 12px 18px; gap: 10px; }
+    .input-bar { padding: 10px 12px 10px; padding-bottom: max(10px, env(safe-area-inset-bottom, 10px)); margin-top: var(--content-gap); }
+    .welcome-chips { gap: 8px; }
+    .chip { font-size: 0.72rem; padding: 8px 16px; }
+    .action-btn { width: 34px; height: 34px; min-width: 34px; border-radius: 8px; }
+    .action-btn svg { width: 17px; height: 17px; }
+    .input-actions { gap: 5px; }
+    .input-wrapper { gap: 4px; }
+    .search-results-widget { width: 100vw; max-width: 100%; }
+    .search-results-header { padding: 12px 14px; }
+    .search-results-query { font-size: 0.72rem; padding: 10px 14px 12px; }
+    .search-results-answer { font-size: 0.82rem; padding: 12px 14px; max-height: 160px; }
+    .search-results-list { padding: 12px 14px 18px; gap: 10px; }
+    .search-result-card { padding: 12px 14px; }
+    .search-result-card .card-title { font-size: 0.76rem; }
+    .search-result-card .card-content { font-size: 0.72rem; -webkit-line-clamp: 3; }
+    .activity-panel { width: 100vw; }
+    .activity-header { padding: 12px 14px; }
+    .activity-list { padding: 12px 14px 18px; gap: 10px; }
+    .mode-switch-three .mode-btn { padding: 8px 10px; font-size: 0.68rem; }
+    .mode-switch-three .mode-btn .mode-btn-text { display: none; }   /* Icons only on phone */
+    .speech-widget { bottom: calc(var(--input-bar-h) + var(--panel-gap)); min-width: min(260px, 92vw); padding: 10px 14px; }
+    .speech-widget-label { font-size: 0.65rem; }
+    .speech-widget-text { font-size: 0.82rem; }
+}
