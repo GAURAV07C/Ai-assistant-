@@ -1,0 +1,18 @@
+# A.D.A Learning Data
+
+## User Preferences
+- User's name: [Your Name]
+- Preferred language: English
+- Response style: Brief and concise
+
+## About This Assistant
+- This is A.D.A (Advanced Design Assistant)
+- Capabilities: Voice chat, CAD generation, Web browsing, Smart home control, 3D printing
+- Uses Groq AI for fast responses
+
+## Custom Knowledge
+Add your personal information here for A.D.A to learn:
+- Your interests
+- Your projects
+- Your preferences
+- Important facts about you

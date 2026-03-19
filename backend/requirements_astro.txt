@@ -1,0 +1,11 @@
+# For ASTRO-style features in A.D.A
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-groq>=0.1.0
+langchain-huggingface>=0.0.1
+langchain-community>=0.0.1
+faiss-cpu>=1.7.0
+sentence-transformers>=2.2.0
+tavily>=0.2.0
+edge-tts>=6.1.0
+python-dotenv>=1.0.0
