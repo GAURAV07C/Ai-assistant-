@@ -4,11 +4,12 @@
 ![React](https://img.shields.io/badge/React-18.2-61DAFB?logo=react)
 ![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron)
 ![Gemini](https://img.shields.io/badge/Google%20Gemini-Native%20Audio-4285F4?logo=google)
+![Groq](https://img.shields.io/badge/Groq-Llama3.3-FF6B6B?logo=groq)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 > **A.D.A** = **A**dvanced **D**esign **A**ssistant
 
-ADA V2 is a sophisticated AI assistant designed for multimodal interaction. It combines Google's Gemini 2.5 Native Audio with computer vision, gesture control, and 3D CAD generation in a Electron desktop application.
+ADA V2 is a sophisticated AI assistant designed for multimodal interaction. It combines Google's Gemini 2.5 Native Audio with computer vision, gesture control, and 3D CAD generation in a Electron desktop application. Now with **ASTRO-style web chat** powered by Groq LLM!
 
 ---
 
@@ -17,6 +18,13 @@ ADA V2 is a sophisticated AI assistant designed for multimodal interaction. It c
 | Feature | Description | Technology |
 |---------|-------------|------------|
 | **🗣️ Low-Latency Voice** | Real-time conversation with interrupt handling | Gemini 2.5 Native Audio |
+| **🌐 Web Chat** | ASTRO-style chat interface with Groq LLM | Groq Llama 3.3 + Tavily Search |
+| **🔍 Web Search** | Real-time information via Tavily AI | Tavily API |
+| **🧠 Learning System** | RAG-powered knowledge base | FAISS + Sentence Transformers |
+| **💾 Session Memory** | Persistent conversation history | JSON file storage |
+| **🔑 Multi-Key Rotation** | Fallback on rate limits | Multiple Groq API keys |
+| **🔊 TTS Voice** | Text-to-speech output | Microsoft Edge TTS |
+| **🗣️ Voice Input** | Speech recognition | Web Speech API |
 | **🧊 Parametric CAD** | Editable 3D model generation from voice prompts | `build123d` → STL |
 | **🖨️ 3D Printing** | Slicing and wireless print job submission | OrcaSlicer + Moonraker/OctoPrint |
 | **🖐️ Minority Report UI** | Gesture-controlled window manipulation | MediaPipe Hand Tracking |
@@ -24,18 +32,6 @@ ADA V2 is a sophisticated AI assistant designed for multimodal interaction. It c
 | **🌐 Web Agent** | Autonomous browser automation | Playwright + Chromium |
 | **🏠 Smart Home** | Voice control for TP-Link Kasa devices | `python-kasa` |
 | **📁 Project Memory** | Persistent context across sessions | File-based JSON storage |
-
-### 🖐️ Gesture Control Details
-
-ADA's "Minority Report" interface uses your webcam to detect hand gestures:
-
-| Gesture | Action |
-|---------|--------|
-| 🤏 **Pinch** | Confirm action / click |
-| ✋ **Open Palm** | Release the window |
-| ✊ **Close Fist** | "Select" and grab a UI window to drag it |
-
-> **Tip**: Enable the video feed window to see the hand tracking overlay.
 
 ---
 
@@ -48,11 +44,17 @@ graph TB
         THREE[Three.js 3D Viewer]
         GESTURE[MediaPipe Gestures]
         SOCKET_C[Socket.IO Client]
+        WEB_CHAT[Web Chat UI]
     end
     
     subgraph Backend ["Backend (Python 3.11 + FastAPI)"]
         SERVER[server.py<br/>Socket.IO Server]
         ADA[ada.py<br/>Gemini Live API]
+        GROQ[groq_service.py<br/>Groq LLM + Multi-Key]
+        SEARCH[web_search.py<br/>Tavily Search]
+        VECTOR[vector_store.py<br/>FAISS RAG]
+        CHAT[chat_service.py<br/>Session Management]
+        TTS[tts_service.py<br/>Edge TTS]
         WEB[web_agent.py<br/>Playwright Browser]
         CAD[cad_agent.py<br/>CAD + build123d]
         PRINTER[printer_agent.py<br/>3D Printing + OrcaSlicer]
@@ -62,8 +64,14 @@ graph TB
     end
     
     UI --> SOCKET_C
+    WEB_CHAT -->|HTTP/REST| SERVER
     SOCKET_C <--> SERVER
     SERVER --> ADA
+    SERVER --> GROQ
+    SERVER --> SEARCH
+    SERVER --> VECTOR
+    SERVER --> CHAT
+    SERVER --> TTS
     ADA --> WEB
     ADA --> CAD
     ADA --> KASA
@@ -72,6 +80,37 @@ graph TB
     SERVER --> PRINTER
     CAD -->|STL file| THREE
     CAD -->|STL file| PRINTER
+```
+
+---
+
+## 🚀 New: Web Chat Feature (ASTRO-Style)
+
+ADA V2 now includes an **ASTRO-style web chat interface** powered by Groq LLM!
+
+### Features:
+- 🌐 **3 Chat Modes**: Auto (AI decides), General (no search), Web Search (Tavily)
+- 🗣️ **Voice Input**: Click mic and speak
+- 🔊 **TTS Output**: Enable speaker for voice responses
+- 📊 **Activity Panel**: See AI decision-making process
+- 🔍 **Search Results**: View sources in real-time
+- 💾 **Session Memory**: Conversations persist across restarts
+- 🎨 **Animated Orb**: WebGL background animation
+
+### Quick Start with Web Chat:
+```bash
+# Install ASTRO dependencies
+pip install -r backend/requirements_astro.txt
+
+# Copy and configure .env
+cp backend/.env.example backend/.env
+# Add your GROQ_API_KEY and TAVILY_API_KEY
+
+# Run the app
+npm run dev
+
+# Open web chat in browser
+# http://localhost:5173 (when running dev server)
 ```
 
 ---
@@ -89,13 +128,19 @@ git clone https://github.com/nazirlouis/ada_v2.git && cd ada_v2
 conda create -n ada_v2 python=3.11 -y && conda activate ada_v2
 brew install portaudio  # macOS only (for PyAudio)
 pip install -r requirements.txt
-playwright install chromium
+
+# 2b. Install ASTRO dependencies (optional - for web chat)
+pip install -r backend/requirements_astro.txt
 
 # 3. Setup frontend
 npm install
 
 # 4. Create .env file
 echo "GEMINI_API_KEY=your_key_here" > .env
+
+# Optional: Groq API for web chat
+echo "GROQ_API_KEY=your_groq_key" >> .env
+echo "TAVILY_API_KEY=your_tavily_key" >> .env
 
 # 5. Run!
 conda activate ada_v2 && npm run dev
@@ -106,40 +151,6 @@ conda activate ada_v2 && npm run dev
 ---
 
 ## 🛠️ Installation Requirements
-
-### 🆕 Absolute Beginner Setup (Start Here)
-If you have never coded before, follow these steps first!
-
-**Step 1: Install Visual Studio Code (The Editor)**
-- Download and install [VS Code](https://code.visualstudio.com/). This is where you will write code and run commands.
-
-**Step 2: Install Anaconda (The Manager)**
-- Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (a lightweight version of Anaconda).
-- This tool allows us to create isolated "playgrounds" (environments) for our code so different projects don't break each other.
-- **Windows Users**: During install, check "Add Anaconda to my PATH environment variable" (even if it says not recommended, it makes things easier for beginners).
-
-**Step 3: Install Git (The Downloader)**
-- **Windows**: Download [Git for Windows](https://git-scm.com/download/win).
-- **Mac**: Open the "Terminal" app (Cmd+Space, type Terminal) and type `git`. If not installed, it will ask to install developer tools—say yes.
-
-**Step 4: Get the Code**
-1. Open your terminal (or Command Prompt on Windows).
-2. Type this command and hit Enter:
-   ```bash
-   git clone https://github.com/nazirlouis/ada_v2.git
-   ```
-3. This creates a folder named `ada_v2`.
-
-**Step 5: Open in VS Code**
-1. Open VS Code.
-2. Go to **File > Open Folder**.
-3. Select the `ada_v2` folder you just downloaded.
-4. Open the internal terminal: Press `Ctrl + ~` (tilde) or go to **Terminal > New Terminal**.
-
----
-
-### ⚠️ Technical Prerequisites
-Once you have the basics above, continue here.
 
 ### 1. System Dependencies
 
@@ -153,7 +164,6 @@ brew install portaudio
 - No additional system dependencies required!
 
 ### 2. Python Environment
-Create a single Python 3.11 environment:
 
 ```bash
 conda create -n ada_v2 python=3.11
@@ -162,183 +172,95 @@ conda activate ada_v2
 # Install all dependencies
 pip install -r requirements.txt
 
+# Install ASTRO dependencies (for web chat)
+pip install -r backend/requirements_astro.txt
+
 # Install Playwright browsers
 playwright install chromium
 ```
 
 ### 3. Frontend Setup
-Requires **Node.js 18+** and **npm**. Download from [nodejs.org](https://nodejs.org/) if not installed.
+
+Requires **Node.js 18+** and **npm**.
 
 ```bash
-# Verify Node is installed
-node --version  # Should show v18.x or higher
-
-# Install frontend dependencies
 npm install
 ```
 
-### 4. 🔐 Face Authentication Setup
-To use the secure voice features, ADA needs to know what you look like.
+### 4. API Keys Setup
 
-1. Take a clear photo of your face (or use an existing one).
-2. Rename the file to `reference.jpg`.
-3. Drag and drop this file into the `ada_v2/backend` folder.
-4. (Optional) You can toggle this feature on/off in `settings.json` by changing `"face_auth_enabled": true/false`.
+#### Gemini API Key (for voice features)
+1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Create API key
+3. Add to `.env`: `GEMINI_API_KEY=your_key`
+
+#### Groq API Key (for web chat)
+1. Get free key at [console.groq.com](https://console.groq.com)
+2. Add to `backend/.env`: `GROQ_API_KEY=your_key`
+
+#### Tavily API Key (for web search)
+1. Get free key at [tavily.com](https://tavily.com)
+2. Add to `backend/.env`: `TAVILY_API_KEY=your_key`
+
+### 5. 🔐 Face Authentication Setup
+
+1. Take a photo of your face
+2. Rename to `reference.jpg`
+3. Place in `backend/` folder
+
+### 6. 🖨️ 3D Printer Setup
+
+Supported: Klipper/Moonraker, OctoPrint, PrusaLink
 
 ---
 
-## ⚙️ Configuration (`settings.json`)
+## ⚙️ Configuration
 
-The system creates a `settings.json` file on first run. You can modify this to change behavior:
-
+### settings.json
 | Key | Type | Description |
 | :--- | :--- | :--- |
-| `face_auth_enabled` | `bool` | If `true`, blocks all AI interaction until your face is recognized via the camera. |
-| `tool_permissions` | `obj` | Controls manual approval for specific tools. |
-| `tool_permissions.generate_cad` | `bool` | If `true`, requires you to click "Confirm" on the UI before generating CAD. |
-| `tool_permissions.run_web_agent` | `bool` | If `true`, requires confirmation before opening the browser agent. |
-| `tool_permissions.write_file` | `bool` | **Critical**: Requires confirmation before the AI writes code/files to disk. |
+| `face_auth_enabled` | `bool` | Face authentication on/off |
+| `tool_permissions` | `obj` | Manual approval for tools |
 
----
-
-### 5. 🖨️ 3D Printer Setup
-ADA V2 can slice STL files and send them directly to your 3D printer.
-
-**Supported Hardware:**
-- **Klipper/Moonraker** (Creality K1, Voron, etc.)
-- **OctoPrint** instances
-- **PrusaLink** (Experimental)
-
-**Step 1: Install Slicer**
-ADA uses **OrcaSlicer** (recommended) or PrusaSlicer to generate G-code.
-1. Download and install [OrcaSlicer](https://github.com/SoftFever/OrcaSlicer).
-2. Run it once to ensure profiles are created.
-3. ADA automatically detects the installation path.
-
-**Step 2: Connect Printer**
-1. Ensure your printer and computer are on the **same Wi-Fi network**.
-2. Open the **Printer Window** in ADA (Cube icon).
-3. ADA automatically scans for printers using mDNS.
-4. **Manual Connection**: If your printer isn't found, use the "Add Printer" button and enter the IP address (e.g., `192.168.1.50`).
-
----
-
-### 6. 🔑 Gemini API Key Setup
-ADA uses Google's Gemini API for voice and intelligence. You need a free API key.
-
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
-2. Sign in with your Google account.
-3. Click **"Create API Key"** and copy the generated key.
-4. Create a file named `.env` in the `ada_v2` folder (same level as `README.md`).
-5. Add this line to the file:
-   ```
-   GEMINI_API_KEY=your_api_key_here
-   ```
-6. Replace `your_api_key_here` with the key you copied.
-
-> **Note**: Keep this key private! Never commit your `.env` file to Git.
+### Environment Variables
+| Variable | Description |
+| :--- | :--- |
+| `GEMINI_API_KEY` | Google Gemini API (voice features) |
+| `GROQ_API_KEY` | Groq API (web chat) |
+| `TAVILY_API_KEY` | Tavily API (web search) |
+| `TTS_VOICE` | Edge TTS voice (default: en-GB-RyanNeural) |
 
 ---
 
 ## 🚀 Running ADA V2
 
-You have two options to run the app. Ensure your `ada_v2` environment is active!
+### Option 1: Easy Way
+```bash
+conda activate ada_v2
+npm run dev
+```
 
-### Option 1: The "Easy" Way (Single Terminal)
-The app is smart enough to start the backend for you.
-1. Open your terminal in the `ada_v2` folder.
-2. Activate your environment: `conda activate ada_v2`
-3. Run:
-   ```bash
-   npm run dev
-   ```
-4. The backend will start automatically in the background.
-
-### Option 2: The "Developer" Way (Two Terminals)
-Use this if you want to see the Python logs (recommended for debugging).
-
-**Terminal 1 (Backend):**
+### Option 2: Developer Way
+**Terminal 1:**
 ```bash
 conda activate ada_v2
 python backend/server.py
 ```
 
-**Terminal 2 (Frontend):**
+**Terminal 2:**
 ```bash
-# Environment doesn't matter here, but keep it simple
 npm run dev
 ```
 
 ---
 
-## ✅ First Flight Checklist (Things to Test)
+## ✅ First Flight Checklist
 
-1. **Voice Check**: Say "Hello Ada". She should respond.
-2. **Vision Check**: Look at the camera. If Face Auth is on, the lock screen should unlock.
-3. **CAD Check**: Open the CAD window and say "Create a cube". Watch the logs.
-4. **Web Check**: Open the Browser window and say "Go to Google".
-5. **Smart Home**: If you have Kasa devices, say "Turn on the lights".
-
----
-
-## ▶️ Commands & Tools Reference
-
-### 🗣️ Voice Commands
-- "Switch project to [Name]"
-- "Create a new project called [Name]"
-- "Turn on the [Room] light"
-- "Make the light [Color]"
-- "Pause audio" / "Stop audio"
-
-### 🧊 3D CAD
-- **Prompt**: "Create a 3D model of a hex bolt."
-- **Iterate**: "Make the head thinner." (Requires previous context)
-- **Files**: Saves to `projects/[ProjectName]/output.stl`.
-
-### 🌐 Web Agent
-- **Prompt**: "Go to Amazon and find a USB-C cable under $10."
-- **Note**: The agent will auto-scroll, click, and type. Do not interfere with the browser window while it runs.
-
-### 🖨️ Printing & Slicing
-- **Auto-Discovery**: ADA automatically finds printers on your network.
-- **Slicing**: Click "Slice & Print" on any generated 3D model.
-- **Profiles**: ADA intelligently selects the correct OrcaSlicer profile based on your printer's name (e.g., "Creality K1").
-
----
-
-## ❓ Troubleshooting FAQ
-
-### Camera not working / Permission denied (Mac)
-**Symptoms**: Error about camera access, or video feed shows black.
-
-**Solution**:
-1. Go to **System Preferences > Privacy & Security > Camera**.
-2. Ensure your terminal app (e.g., Terminal, iTerm, VS Code) has camera access enabled.
-3. Restart the app after granting permission.
-
----
-
-### `GEMINI_API_KEY` not found / Authentication Error
-**Symptoms**: Backend crashes on startup with "API key not found".
-
-**Solution**:
-1. Make sure your `.env` file is in the root `ada_v2` folder (not inside `backend/`).
-2. Verify the format is exactly: `GEMINI_API_KEY=your_key` (no quotes, no spaces).
-3. Restart the backend after editing the file.
-
----
-
-### WebSocket connection errors (1011)
-**Symptoms**: `websockets.exceptions.ConnectionClosedError: 1011 (internal error)`.
-
-**Solution**:
-This is a server-side issue from the Gemini API. Simply reconnect by clicking the connect button or saying "Hello Ada" again. If it persists, check your internet connection or try again later.
-
----
-
-## 📸 What It Looks Like
-
-*Coming soon! Screenshots and demo videos will be added here.*
+1. **Voice**: Say "Hello Ada"
+2. **Web Chat**: Click Globe icon for ASTRO-style chat
+3. **CAD**: Say "Create a cube"
+4. **Web Agent**: Say "Go to Google"
+5. **Smart Home**: "Turn on the lights"
 
 ---
 
@@ -347,87 +269,78 @@ This is a server-side issue from the Gemini API. Simply reconnect by clicking th
 ```
 ada_v2/
 ├── backend/                    # Python server & AI logic
-│   ├── ada.py                  # Gemini Live API integration
 │   ├── server.py               # FastAPI + Socket.IO server
-│   ├── cad_agent.py            # CAD generation orchestrator
-│   ├── printer_agent.py        # 3D printer discovery & slicing
-│   ├── web_agent.py            # Playwright browser automation
-│   ├── kasa_agent.py           # TP-Link smart home control
-│   ├── authenticator.py        # MediaPipe face auth logic
-│   ├── project_manager.py      # Project context management
-│   ├── tools.py                # Tool definitions for Gemini
-│   └── reference.jpg           # Your face photo (add this!)
-├── src/                        # React frontend
-│   ├── App.jsx                 # Main application component
-│   ├── components/             # UI components (11 files)
-│   └── index.css               # Global styles
-├── electron/                   # Electron main process
-│   └── main.js                 # Window & IPC setup
-├── projects/                   # User project data (auto-created)
-├── .env                        # API keys (create this!)
-├── requirements.txt            # Python dependencies
-├── package.json                # Node.js dependencies
-└── README.md                   # You are here!
+│   ├── ada.py                 # Gemini Live API integration
+│   ├── config_ada.py          # ASTRO configuration
+│   ├── astro_integration.py   # Web chat endpoints
+│   ├── services/
+│   │   ├── groq_service.py    # Groq LLM + multi-key
+│   │   ├── web_search.py     # Tavily search
+│   │   ├── vector_store.py   # FAISS RAG
+│   │   ├── chat_service.py   # Session management
+│   │   └── tts_service.py   # Edge TTS
+│   ├── cad_agent.py           # CAD generation
+│   ├── printer_agent.py       # 3D printing
+│   ├── web_agent.py          # Playwright automation
+│   ├── kasa_agent.py         # Smart home
+│   ├── authenticator.py       # Face auth
+│   └── requirements_astro.txt # ASTRO dependencies
+├── src/                       # React frontend
+│   ├── App.jsx               # Main app + WebChatView
+│   ├── web-chat.html         # Standalone web chat
+│   ├── orb.js                # WebGL animated background
+│   ├── style-astro.css       # Glass-morphism theme
+│   └── components/           # UI components
+├── database/                  # Learning data & sessions
+│   ├── learning_data/        # .txt files for RAG
+│   ├── chats_data/           # Session history
+│   └── vector_store/         # FAISS index
+├── electron/                  # Electron main process
+├── .env                      # API keys
+└── README.md
 ```
 
 ---
 
-## ⚠️ Known Limitations
+## ❓ Troubleshooting FAQ
 
-| Limitation | Details |
-|------------|---------|
-| **macOS & Windows** | Tested on macOS 14+ and Windows 10/11. Linux is untested. |
-| **Camera Required** | Face auth and gesture control need a working webcam. |
-| **Gemini API Quota** | Free tier has rate limits; heavy CAD iteration may hit limits. |
-| **Network Dependency** | Requires internet for Gemini API (no offline mode). |
-| **Single User** | Face auth recognizes one person (the `reference.jpg`). |
+### Web Chat not working
+1. Ensure `GROQ_API_KEY` is set in `backend/.env`
+2. Check backend logs for connection errors
+3. Verify `requirements_astro.txt` are installed
+
+### Voice not responding
+1. Check microphone permissions
+2. Ensure `GEMINI_API_KEY` is valid
+3. Check console for errors
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how:
-
-1. **Fork** the repository.
-2. **Create a branch**: `git checkout -b feature/amazing-feature`
-3. **Commit** your changes: `git commit -m 'Add amazing feature'`
-4. **Push** to the branch: `git push origin feature/amazing-feature`
-5. **Open a Pull Request** with a clear description.
-
-### Development Tips
-
-- Run the backend separately (`python backend/server.py`) to see Python logs.
-- Use `npm run dev` without Electron during frontend development (faster reload).
-- The `projects/` folder contains user data—don't commit it to Git.
-
----
-
-## 🔒 Security Considerations
-
-| Aspect | Implementation |
-|--------|----------------|
-| **API Keys** | Stored in `.env`, never committed to Git. |
-| **Face Data** | Processed locally, never uploaded. |
-| **Tool Confirmations** | Write/CAD/Web actions can require user approval. |
-| **No Cloud Storage** | All project data stays on your machine. |
-
-> [!WARNING]
-> Never share your `.env` file or `reference.jpg`. These contain sensitive credentials and biometric data.
+1. **Fork** the repository
+2. **Create branch**: `git checkout -b feature/amazing-feature`
+3. **Commit**: `git commit -m 'Add amazing feature'`
+4. **Push**: `git push origin feature/amazing-feature`
+5. **Open Pull Request**
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **[Google Gemini](https://deepmind.google/technologies/gemini/)** — Native Audio API for real-time voice
-- **[build123d](https://github.com/gumyr/build123d)** — Modern parametric CAD library
-- **[MediaPipe](https://developers.google.com/mediapipe)** — Hand tracking, gesture recognition, and face authentication
-- **[Playwright](https://playwright.dev/)** — Reliable browser automation
+- **[Google Gemini](https://deepmind.google/technologies/gemini/)** — Native Audio API
+- **[Groq](https://groq.com/)** — Fast LLM inference
+- **[Tavily](https://tavily.com/)** — AI search
+- **[build123d](https://github.com/gumyr/build123d)** — Parametric CAD
+- **[MediaPipe](https://developers.google.com/mediapipe)** — Hand tracking & face auth
+- **[Playwright](https://playwright.dev/)** — Browser automation
+- **[Edge TTS](https://github.com/rany2/edge-tts)** — Text-to-speech
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file.
 
 ---
 
